@@ -7,7 +7,7 @@ import pandas as pd
 import time
 import json
 access_token = 'EAAQSkouZCNP0BACuqUylUQ9LWAYgt97HirZAZBRxoBaRXPRd6e5p1tiswMeSncA2sIacFbDTG1v9mf8yCw6oC6lWVfiW6rEzIfdP24zPeF9wF1N4gTDk9RgM5m4q7PVNIIZCPNMxrbGDcIlLOYjkzTnDZBqvMpJjSqIkyBrR6vZAEe0pR3FuCp'
-driver = webdriver.Firefox(executable_path='C:/Users/micah/geckodriver-v0.31.0-win64/geckodriver.exe')
+driver = webdriver.Firefox(executable_path='./geckodriver.exe')
 def login(driver):
     with open("smith.txt", 'r') as f:
         account = (f.read()).split(",")
