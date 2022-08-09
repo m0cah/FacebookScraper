@@ -120,6 +120,13 @@ def pseudo_page_count(driver):
     posts = bs_data.find_all('div', class_='du4w35lb k4urcfbm l9j0dhe7 sjgh65i0')
     return(len(posts))
 
+def jobTest(row):
+    for job in (row['Job']):
+        if("Army" in str(job).lower()):
+            return True
+        else:
+            return False
+
 login(driver)
 generalSearch(driver)
 df = getDataFrame()
