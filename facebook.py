@@ -151,6 +151,80 @@ for idx, data in df.groupby(level='id'):
         time.sleep(3)
     count +=1
     newdata = pd.concat([newdata, row])
+def isNameSame(id):
+    global newdata
+    general = newdata.at[id, 'General']
+    name = newdata.at[id, 'Name']
+    name = name.split(' ')
+    same = False
+    general = general.split(' ')
+    if len(general) == len(name) and len(general)==3:
+        if general[0].lower() == name[0].lower():
+            if general[1][0].lower() == name[1][0].lower():
+                if general[2].lower() == name[2].lower():
+                    same = True
+    elif len(general) == len(name) and len(general)==2:
+        if general[0].lower() == name[0].lower():
+            if general[1].lower() == name[1].lower():
+                same = True
+    elif len(general) == 3:
+        if general[0].lower() == name[0].lower():
+            if general[2].lower() == name[1].lower():
+                same = True
+    elif len(general)==4 and len(general)==len(name):
+        if general[0].lower() == name[0].lower():
+            if general[1][0].lower() == name[1][0].lower():
+                if general[2].lower() == name[2].lower():
+                    if general[3][0:2].lower() == name[3][0:2].lower():
+                        same = True
+
+    else:
+        if general[0].lower() == name[0].lower():
+            if general[1].lower() == name[-1].lower():
+                same = True
+    if same:
+        newdata.at[id,'name_is_same'] = True
+    return same
+def jobTest(id):
+    global newdata
+    jobs = newdata.at[id,'Job']
+    jobs =jobs[2:len(jobs)-2].split(',')
+    for job in jobs:
+        if"army" in str(job).lower() or 'general' in str(job).lower():
+            newdata.at[id, 'in_army'] = True
+            return True
+    return False
+def postCheck(id):
+    global newdata
+    count = newdata.at[id, 'Page_count']
+    if count <=5:
+        newdata.at[id, 'post_check'] = True
+        return True
+    else:
+        return False
+def friendCheck(id):
+    global newdata
+    friends = newdata.at[id, 'Friends']
+    if friends < 15:
+        newdata.at[id, 'friend_check'] = True
+        return True
+    else:
+        return False
+def scoreCalc(id, boollist):
+    global newdata
+    trueCount = 0
+    for test in boollist:
+        if test:
+            trueCount +=1
+    if trueCount == 1:
+        newdata.at[id,'score'] = 10
+    if trueCount == 2:
+        newdata.at[id,'score'] = 50
+    if trueCount == 3:
+        newdata.at[id,'score'] = 75
+    if trueCount == 4:
+        newdata.at[id,'score'] = 100
+
 driver.close()
 newdata.set_index('id', inplace=True)
 datatoexcel = pd.ExcelWriter('facebook.xlsx')
@@ -158,7 +232,10 @@ newdata.to_excel(datatoexcel)
 datatoexcel.save()
 data = pd.ExcelFile('facebook.xlsx')
 newdata= data.parse('Sheet1')
-newdata
 newdata = pd.merge(df, newdata, left_on='id', right_on='id')
 newdata.set_index('id', inplace=True)
+for idx in newdata.index:
+    row = newdata.loc[idx]
+    test=[jobTest(idx), isNameSame(idx), friendCheck(idx), postCheck(idx)]
+    scoreCalc(idx, test)
 
