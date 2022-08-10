@@ -185,21 +185,3 @@ def jobTest(id):
             return True
     return False
 
-def postCheck(id):
-    global newdata
-    count = newdata.at[id, 'Page_count']
-    if count < 5:
-        newdata.at[id, 'post_check'] = True
-        return True
-    else:
-        return False
-        
-def friendCheck(id):
-    global newdata
-    friends = newdata.at[id, 'Friends']
-    if friends < 15:
-        newdata.at[id, 'friend_check'] = True
-        return True
-    else:
-        return False
-
