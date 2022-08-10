@@ -7,7 +7,9 @@ import pandas as pd
 import time
 import json
 from bs4 import BeautifulSoup as bs
-driver = webdriver.Firefox(executable_path='./geckodriver.exe')
+
+# driver = webdriver.Firefox(executable_path='C:/Users/micah/geckodriver-v0.31.0-win64/geckodriver.exe')
+# driver = webdriver.Chrome(executable_path='./chromedriver')
 def login(driver):
     with open("smith.txt", 'r') as f:
         account = (f.read()).split(",")
@@ -19,12 +21,14 @@ def login(driver):
     passw.send_keys(account[1])
     login = driver.find_element(By.XPATH,'/html/body/div[1]/div[1]/div[1]/div/div/div/div[2]/div/div[1]/form/div[2]/button')
     login.click()
+
 def generalNameList():
-    #change to general once you find out what is going on
-    x = pd.read_csv('C:/Users/micah/DigitalImposterProject/FaceBook_stuff/names.csv')
+    x = pd.read_csv('names.csv')
     return x['Generals'].to_list()
+
 def nameToLink(name):
     return name.replace(" ", "%20")
+
 def generalSearch(driver):
     generals = generalNameList()
     master_list = ""
@@ -34,21 +38,21 @@ def generalSearch(driver):
         # elem.send_keys(general)
         driver.get("https://www.facebook.com/search/people/?q=" + nameToLink(general))
         textual_healing = driver.page_source
-        expression = '"id":"[0-9]*"'
+        expression = '"profile":{"__typename":"User","__isNode":"User","id":"[0-9]*"'
         ids = re.findall(expression, textual_healing)
         x = np.array(ids)
         p = np.unique(x)
         gen = (general + "/")*len(p)
         p = " ".join(p)
-        gen2 = gen + "," + p
+        gen2 = gen + ";" + p
         master_list += str(gen2) + "\n"
         if count%15 == 0 and count != 0:
-            time.sleep(10)
+            time.sleep(20)
         count +=1
     driver.close()
     with open('general_ids.txt', 'w') as f:
         f.write(str(master_list))
-
+    
 def getDataFrame():
     q = open('general_ids.txt', 'r')
     text = q.read()
@@ -69,6 +73,7 @@ def getDataFrame():
     hier_index = pd.DataFrame(actual, columns=['General', 'id'])
     df = pd.DataFrame(np.zeros(len(actual)),columns=['score'])
     df = pd.concat([hier_index, df], axis=1)
+    df.set_index('id')
     return df
 
 def findFriends(html):
@@ -81,12 +86,14 @@ def findFriends(html):
         return float(hell[0])*1000
     else:
         return float(hell[0])   
+
 def findName(html):
     soup =bs(html, 'html.parser')
     name1=soup.title.get_text()
     name2 = name1.replace('(2)', "")
     name3 = name2.replace(' | Facebook', '')
     return name3
+
 def findInfo(html):
     soup = bs(html, 'html.parser')
     test = soup.find_all('div', class_='rq0escxv l9j0dhe7 du4w35lb j83agx80 cbu4d94t d2edcug0 hpfvmrgz rj1gh0hx buofh1pr g5gj957u o8rfisnq p8fzw8mz pcp91wgn iuny7tx3 ipjc6fyt')
@@ -111,6 +118,7 @@ def findInfo(html):
                 if ' with ' not in item and 'In ' not in item and 'relationship' not in item and 'Married' not in item and "Followed" not in item and "Engaged" not in item and "Single" not in item:
                     dict["Job"].append(item)
     return dict
+
 def pseudo_page_count(driver):
     for i in range(8):
         driver.execute_script("window.scrollTo(0, window.scrollY + 600)")
@@ -120,45 +128,78 @@ def pseudo_page_count(driver):
     posts = bs_data.find_all('div', class_='du4w35lb k4urcfbm l9j0dhe7 sjgh65i0')
     return(len(posts))
 
-def jobTest(row):
-    for job in (row['Job']):
-        if("Army" in str(job).lower()):
-            return True
-        else:
-            return False
+def getBannerImage(id, html):
+    global newdata
+    soup = bs(html, 'html.parser')
+    bannerImage = soup.find("img", {"data-imgperflogname" : "profileCoverPhoto"})
+    if(bannerImage is not None and bannerImage.has_attr('src')):
+        newdata.at[id, 'Banner URL'] = bannerImage['src']
+    else:
+        newdata.at[id, 'Banner URL'] = "No Banner"
 
-login(driver)
-generalSearch(driver)
-df = getDataFrame()
-driver.close()
-driver = webdriver.Firefox(executable_path='./geckodriver.exe')
-login(driver)
-count = 0
-newdata = pd.DataFrame()
-for idx, data in df.groupby(level='id'):
-    array = []
-    driver.get('https://www.facebook.com/profile.php?id=' + idx)
-    html = driver.page_source
-    friends = findFriends(html)
-    info = findInfo(html)
-    job = info['Job']
-    current_town = info['Current_town']
-    home_town = info['Hometown']
-    name = findName(html)
-    page_count = pseudo_page_count(driver)
-    row = pd.DataFrame(data = np.array([[idx,name,job, current_town, home_town, page_count, friends]],dtype=object),columns=['id','Name','Job','Current_town', 'Home_town', 'Page_count', 'Friends'])
-    if count%15 == 0 and count != 0:
-        time.sleep(3)
-    count +=1
-    newdata = pd.concat([newdata, row])
-driver.close()
-newdata.set_index('id', inplace=True)
-datatoexcel = pd.ExcelWriter('facebook.xlsx')
-newdata.to_excel(datatoexcel)
-datatoexcel.save()
-data = pd.ExcelFile('facebook.xlsx')
-newdata= data.parse('Sheet1')
-newdata
-newdata = pd.merge(df, newdata, left_on='id', right_on='id')
-newdata.set_index('id', inplace=True)
+def isNameSame(id):
+    global newdata
+    general = newdata.at[id, 'General']
+    name = newdata.at[id, 'Name']
+    name = name.split(' ')
+    same = False
+    general = general.split(' ')
+    if len(general) == len(name) and len(general)==3:
+        if general[0].lower() == name[0].lower():
+            if general[1][0].lower() == name[1][0].lower():
+                if general[2].lower() == name[2].lower():
+                    same = True
+    elif len(general) == len(name) and len(general)==2:
+        if general[0].lower() == name[0].lower():
+            if general[1].lower() == name[1].lower():
+                same = True
+    elif len(general) == 3:
+        if general[0].lower() == name[0].lower():
+            if general[2].lower() == name[1].lower():
+                same = True
+    elif len(general)==4 and len(general)==len(name):
+        if general[0].lower() == name[0].lower():
+            if general[1][0].lower() == name[1][0].lower():
+                if general[2].lower() == name[2].lower():
+                    if general[3][0:2].lower() == name[3][0:2].lower():
+                        same = True
+
+    else:
+        if general[0].lower() == name[0].lower():
+            if general[1].lower() == name[-1].lower():
+                same = True
+    if same:
+        newdata.at[id,'name_is_same'] = True
+    return same
+
+def jobTest(id):
+    global newdata
+    jobs = newdata.at[id,'Job']
+    jobs =jobs[2:len(jobs)-2].split(',')
+    if jobs ==[""]:
+        newdata.at[id, 'in_army'] = True
+        return True
+    for job in jobs:
+        if"army" in str(job).lower() or 'general' in str(job).lower():
+            newdata.at[id, 'in_army'] = True
+            return True
+    return False
+
+def postCheck(id):
+    global newdata
+    count = newdata.at[id, 'Page_count']
+    if count < 5:
+        newdata.at[id, 'post_check'] = True
+        return True
+    else:
+        return False
+        
+def friendCheck(id):
+    global newdata
+    friends = newdata.at[id, 'Friends']
+    if friends < 15:
+        newdata.at[id, 'friend_check'] = True
+        return True
+    else:
+        return False
 
