@@ -1,0 +1,2 @@
+#Ignores .env when pushing to GitHub
+.env
