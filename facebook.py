@@ -17,10 +17,10 @@ def login(driver):
     driver.get("https://www.facebook.com/")
     email = driver.find_element(By.XPATH, '//*[@id="email"]')
     sleep(1.5)
-    email.send_keys(os.getenv('EMAIL2'))
+    email.send_keys(os.getenv('EMAIL'))
     password = driver.find_element(By.XPATH,'//*[@id="pass"]')
     sleep(1.5)
-    password.send_keys(os.getenv('PASWD2'))
+    password.send_keys(os.getenv('PASWD'))
     sleep(1.5)
     driver.find_element(By.XPATH,'/html/body/div[1]/div[1]/div[1]/div/div/div/div[2]/div/div[1]/form/div[2]/button').click()
 def generalNameList():
@@ -139,6 +139,7 @@ def getPostElements(soup):
     multiple=[]
     posts = soup.find_all('div', class_='du4w35lb k4urcfbm l9j0dhe7 sjgh65i0')
     for post in posts:
+        data = {}
         date = post.find('a', class_='oajrlxb2 g5ia77u1 qu0x051f esr5mh6w e9989ue4 r7d6kgcz rq0escxv nhd2j8a9 nc684nl6 p7hjln8o kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x jb3vyjys rz4wbd8a qt6c0cv9 a8nywdso i1ao9s8h esuyzwwr f1sip0of lzcic4wl gmql0nx0 gpro0wi8 b1v8xokw')
         status = post.find('span', class_='d2edcug0 hpfvmrgz qv66sw1b c1et5uql lr9zc1uh jq4qci2q a3bd9o3v b1v8xokw m9osqain')
         image = post.find('img')
@@ -147,18 +148,22 @@ def getPostElements(soup):
             link = post.find('a', class_='oajrlxb2 g5ia77u1 qu0x051f esr5mh6w e9989ue4 r7d6kgcz rq0escxv nhd2j8a9 nc684nl6 p7hjln8o kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x jb3vyjys rz4wbd8a qt6c0cv9 a8nywdso i1ao9s8h esuyzwwr f1sip0of lzcic4wl gmql0nx0 gpro0wi8 datstx6m k4urcfbm')['href']
         except:
             link = ""
+        data["link"]=link
         try:
             text = text.get_text()
         except:
             text = ""
+        data['text'] = text
         try:
             date= date.get_text()
         except:
             date=""
-        if not isinstance(status, type(None)):
-            data = {'status':""}
-        else:
-            data = {'status':status.get_text(), 'date': date, 'text' : text, 'link':link}
+        data['date'] = date
+        try:
+            status = status.get_text()
+        except:
+            status = ""
+        data['status'] = status
         try:
             image=image['src']
             url = image.replace('amp;', '')
@@ -302,7 +307,7 @@ def scoreCalc(idx,checks):
     if count == 4:
         newdata.at[idx, 'score'] = 100
 def scroll(driver):
-    SCROLL_PAUSE_TIME = 1
+    SCROLL_PAUSE_TIME = 1.2
     last_height = driver.execute_script("return document.documentElement.scrollHeight")
     while True:
         # Scroll down to bottom
@@ -361,7 +366,7 @@ def run():
             ],dtype=object),
             columns=['id','Name','Job','Current_town', 'Home_town', 'Page_count', 'Number of Friends', 
             'Banner URL', 'Profile URL', 'Friends List', 'Comments', 'Likes', 'Shares', 'Post Elements'])
-        if count%15 == 0 and count != 0:
+        if count%10 == 0 and count != 0:
             sleep(15)
         count +=1
         newdata = pd.concat([newdata, row])
