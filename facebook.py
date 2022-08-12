@@ -190,7 +190,6 @@ def getFriendList(id,driver, friends):
                 name = name.get_text()
                 data = {'name':name, 'link':link}
                 friendlist.append(data)
-def getFriendList(driver):
     driver.get("https://www.facebook.com/profile.php?id="+str(id)+"&sk=friends")
     for i in range(8):
         driver.execute_script("window.scrollTo(0, window.scrollY + 600)")
@@ -355,7 +354,7 @@ def run():
         job = info['Job']
         current_town = info['Current_town']
         home_town = info['Hometown']
-        name = getName(html)
+        name = getName(soup)
         page_count = getPostCount(soup)
         bannerImageURL = getBannerImageURL(soup)
         profilePictureURL = getProfilePictureURL(soup)
