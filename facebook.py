@@ -1,34 +1,33 @@
+# <---  Initial Imports --->
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 import re
 import numpy as np
 import pandas as pd
-import time
-import json
+from time import sleep
 from bs4 import BeautifulSoup as bs
+from dotenv import load_dotenv
+import os
+load_dotenv()
+# <---  End of Initial Imports --->
 
-# driver = webdriver.Firefox(executable_path='C:/Users/micah/geckodriver-v0.31.0-win64/geckodriver.exe')
-# driver = webdriver.Chrome(executable_path='./chromedriver')
+# <--- Start of Functions --->
 def login(driver):
-    with open("smith.txt", 'r') as f:
-        account = (f.read()).split(",")
     driver.get("https://www.facebook.com/")
-    elem = driver.find_element(By.XPATH, '//*[@id="email"]')
-    elem.clear()
-    elem.send_keys(account[0])
-    passw = driver.find_element(By.XPATH,'//*[@id="pass"]')
-    passw.send_keys(account[1])
-    login = driver.find_element(By.XPATH,'/html/body/div[1]/div[1]/div[1]/div/div/div/div[2]/div/div[1]/form/div[2]/button')
-    login.click()
-
+    email = driver.find_element(By.XPATH, '//*[@id="email"]')
+    sleep(1.5)
+    email.send_keys(os.getenv('EMAIL2'))
+    password = driver.find_element(By.XPATH,'//*[@id="pass"]')
+    sleep(1.5)
+    password.send_keys(os.getenv('PASWD2'))
+    sleep(1.5)
+    driver.find_element(By.XPATH,'/html/body/div[1]/div[1]/div[1]/div/div/div/div[2]/div/div[1]/form/div[2]/button').click()
 def generalNameList():
     x = pd.read_csv('names.csv')
     return x['Generals'].to_list()
-
 def nameToLink(name):
     return name.replace(" ", "%20")
-
 def generalSearch(driver):
     generals = generalNameList()
     master_list = ""
@@ -47,12 +46,11 @@ def generalSearch(driver):
         gen2 = gen + ";" + p
         master_list += str(gen2) + "\n"
         if count%15 == 0 and count != 0:
-            time.sleep(20)
+            sleep(20)
         count +=1
     driver.close()
     with open('general_ids.txt', 'w') as f:
         f.write(str(master_list))
-    
 def getDataFrame():
     q = open('general_ids.txt', 'r')
     text = q.read()
@@ -73,12 +71,11 @@ def getDataFrame():
     hier_index = pd.DataFrame(actual, columns=['General', 'id'])
     df = pd.DataFrame(np.zeros(len(actual)),columns=['score'])
     df = pd.concat([hier_index, df], axis=1)
-    df.set_index('id')
+    df.set_index('id', inplace=True)
     return df
-
-def findFriends(html):
+def getFriendCount(html):
     rex = r'"text":".*\sfriends"'
-    friends = re.findall(rex,html)
+    friends = re.findall(rex, html)
     if friends == []:
         return 0
     hell = re.findall(r'(\d+(?:\.\d+)?)', friends[0])
@@ -86,16 +83,14 @@ def findFriends(html):
         return float(hell[0])*1000
     else:
         return float(hell[0])   
-
-def findName(html):
+def getName(html):
     soup =bs(html, 'html.parser')
     name1=soup.title.get_text()
     name2 = name1.replace('(2)', "")
     name3 = name2.replace(' | Facebook', '')
     return name3
-
-def findInfo(html):
-    soup = bs(html, 'html.parser')
+    
+def getIntro(soup):
     test = soup.find_all('div', class_='rq0escxv l9j0dhe7 du4w35lb j83agx80 cbu4d94t d2edcug0 hpfvmrgz rj1gh0hx buofh1pr g5gj957u o8rfisnq p8fzw8mz pcp91wgn iuny7tx3 ipjc6fyt')
     array = []
     for thing in test:
@@ -118,26 +113,119 @@ def findInfo(html):
                 if ' with ' not in item and 'In ' not in item and 'relationship' not in item and 'Married' not in item and "Followed" not in item and "Engaged" not in item and "Single" not in item:
                     dict["Job"].append(item)
     return dict
-
-def pseudo_page_count(driver):
-    for i in range(8):
-        driver.execute_script("window.scrollTo(0, window.scrollY + 600)")
-        time.sleep(1)
-    source_data = driver.page_source
-    bs_data = bs(source_data, 'html.parser')
-    posts = bs_data.find_all('div', class_='du4w35lb k4urcfbm l9j0dhe7 sjgh65i0')
+def getPostCount(soup):
+    posts = soup.find_all('div', class_='du4w35lb k4urcfbm l9j0dhe7 sjgh65i0')
     return(len(posts))
-
-def getBannerImage(id, html):
-    global newdata
-    soup = bs(html, 'html.parser')
+def getBannerImageURL(soup):
     bannerImage = soup.find("img", {"data-imgperflogname" : "profileCoverPhoto"})
     if(bannerImage is not None and bannerImage.has_attr('src')):
-        newdata.at[id, 'Banner URL'] = bannerImage['src']
+        return bannerImage['src']
     else:
-        newdata.at[id, 'Banner URL'] = "No Banner"
-
-def isNameSame(id):
+        return "No Banner"
+def getProfilePictureURL(soup):
+    q = soup.find('div',class_='b3onmgus e5nlhep0 ph5uu5jm ecm0bbzt spb7xbtv bkmhp75w emlxlaya s45kfl79 cwj9ozl2')
+    image_url = ""
+    if not isinstance(q, type(None)):
+        r = q.find('image')
+        rex = r'href=".*" '
+        x = re.findall(rex,str(r))
+        p = x[0]
+        # removed = re.split('xlink:href=")
+        almost_there=p.replace('href="', '')
+        p = almost_there.replace('"', '')
+        image_url = p.replace('amp;', '')
+    return image_url
+def getPostElements(soup):
+    multiple=[]
+    posts = soup.find_all('div', class_='du4w35lb k4urcfbm l9j0dhe7 sjgh65i0')
+    for post in posts:
+        date = post.find('a', class_='oajrlxb2 g5ia77u1 qu0x051f esr5mh6w e9989ue4 r7d6kgcz rq0escxv nhd2j8a9 nc684nl6 p7hjln8o kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x jb3vyjys rz4wbd8a qt6c0cv9 a8nywdso i1ao9s8h esuyzwwr f1sip0of lzcic4wl gmql0nx0 gpro0wi8 b1v8xokw')
+        status = post.find('span', class_='d2edcug0 hpfvmrgz qv66sw1b c1et5uql lr9zc1uh jq4qci2q a3bd9o3v b1v8xokw m9osqain')
+        image = post.find('img')
+        text = post.find('div', class_='kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x c1et5uql ii04i59q')
+        try:
+            link = post.find('a', class_='oajrlxb2 g5ia77u1 qu0x051f esr5mh6w e9989ue4 r7d6kgcz rq0escxv nhd2j8a9 nc684nl6 p7hjln8o kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x jb3vyjys rz4wbd8a qt6c0cv9 a8nywdso i1ao9s8h esuyzwwr f1sip0of lzcic4wl gmql0nx0 gpro0wi8 datstx6m k4urcfbm')['href']
+        except:
+            link = ""
+        try:
+            text = text.get_text()
+        except:
+            text = ""
+        try:
+            date= date.get_text()
+        except:
+            date=""
+        if not isinstance(status, type(None)):
+            data = {'status':""}
+        else:
+            data = {'status':status.get_text(), 'date': date, 'text' : text, 'link':link}
+        try:
+            image=image['src']
+            url = image.replace('amp;', '')
+            data['image_url'] = url
+        except:
+            data['image_url'] = ""
+        multiple.append(data)
+    return multiple
+def getFriendList(id,driver, friends):
+    friendlist = []
+    if friends > 0:
+        driver.get("https://www.facebook.com/profile.php?id="+str(id)+"&sk=friends")
+        for i in range(8):
+            driver.execute_script("window.scrollTo(0, window.scrollY + 600)")
+            sleep(1.1)
+        html = driver.page_source
+        soup = bs(html, 'html.parser')
+        lister = soup.find('div', class_='j83agx80 btwxx1t3 lhclo0ds i1fnvgqd')
+        if not isinstance(lister, type(None)):
+            friends = lister.find_all('div', class_='buofh1pr hv4rvrfc')
+            for friend in friends:
+                name = friend.find('span',class_='d2edcug0 hpfvmrgz qv66sw1b c1et5uql lr9zc1uh a8c37x1j fe6kdd0r mau55g9w c8b282yb keod5gw0 nxhoafnm aigsh9s9 d3f4x2em mdeji52x a5q79mjw g1cxx5fr lrazzd5p oo9gr5id')
+                link = friend.find('a')['href']
+                name = name.get_text()
+                data = {'name':name, 'link':link}
+                friendlist.append(data)
+    return friendlist
+def getPostStats(soup):
+    posts = soup.find_all('div', {"class" : "stjgntxs ni8dbmo4 l82x9zwi uo3d90p7 h905i5nu monazrh9"})
+    divElements = []
+    for post in posts:
+        try:
+            divElements.append(post.find('div', {"class" : "bp9cbjyn m9osqain j83agx80 jq4qci2q bkfpd7mw a3bd9o3v kvgmc6g5 wkznzc2l oygrvhab dhix69tm jktsbyx5 rz4wbd8a osnr6wyh a8nywdso s1tcr66n"}))
+        except:
+            divElements.append(None)
+    numCommentsList = []
+    for commentsElements in divElements:
+        try:
+            commentElement = commentsElements.find('span',{"class": "d2edcug0 hpfvmrgz qv66sw1b c1et5uql oi732d6d ik7dh3pa ht8s03o8 a8c37x1j fe6kdd0r mau55g9w c8b282yb keod5gw0 nxhoafnm aigsh9s9 d3f4x2em iv3no6db jq4qci2q a3bd9o3v b1v8xokw m9osqain"})
+            if("Comment" in commentElement.get_text()):
+                commentText = commentElement.get_text()
+            else:
+                commentText = "0 Comments"
+        except:
+            commentText = "0 Comments"
+        numCommentsList.append(commentText)
+    numSharesList = []
+    for shareElements in divElements:
+        try:
+            shareElement = shareElements.find('span',{"class": "d2edcug0 hpfvmrgz qv66sw1b c1et5uql oi732d6d ik7dh3pa ht8s03o8 a8c37x1j fe6kdd0r mau55g9w c8b282yb keod5gw0 nxhoafnm aigsh9s9 d3f4x2em iv3no6db jq4qci2q a3bd9o3v b1v8xokw m9osqain"})
+            if("Share" in shareElement.get_text()):
+                shareText = shareElement.get_text()
+            else:
+                shareText = "0 Shares"
+        except:
+            shareText = "0 Shares"
+        numSharesList.append(shareText)
+    numLikesList = []
+    for likeElements in divElements:
+        try:
+            likeElement = likeElements.find('span',{"class": "gpro0wi8 cwj9ozl2 bzsjyuwj ja2t1vim"})
+            likeText = likeElement.get_text() + " Likes"
+        except:
+            likeText = "0 Likes"
+        numLikesList.append(likeText)
+    return [numCommentsList, numLikesList, numSharesList]
+def nameTest(id):
     global newdata
     general = newdata.at[id, 'General']
     name = newdata.at[id, 'Name']
@@ -171,7 +259,6 @@ def isNameSame(id):
     if same:
         newdata.at[id,'name_is_same'] = True
     return same
-
 def jobTest(id):
     global newdata
     jobs = newdata.at[id,'Job']
@@ -184,4 +271,143 @@ def jobTest(id):
             newdata.at[id, 'in_army'] = True
             return True
     return False
+def postTest(id):
+    global newdata
+    count = newdata.at[id, 'Page_count']
+    if count < 5:
+        newdata.at[id, 'post_check'] = True
+        return True
+    else:
+        return False
+def friendTest(id):
+    global newdata
+    friends = newdata.at[id, 'Friends']
+    if friends < 15:
+        newdata.at[id, 'friend_check'] = True
+        return True
+    else:
+        return False
+def scoreCalc(idx,checks):
+    global newdata
+    count =0
+    for check in checks:
+        if check:
+            count+=1
+    if count == 1:
+        newdata.at[idx, 'score'] = 15
+    if count == 2:
+        newdata.at[idx, 'score'] = 50
+    if count == 3:
+        newdata.at[idx, 'score'] = 75
+    if count == 4:
+        newdata.at[idx, 'score'] = 100
+def scroll(driver):
+    SCROLL_PAUSE_TIME = 1
+    last_height = driver.execute_script("return document.documentElement.scrollHeight")
+    while True:
+        # Scroll down to bottom
+        driver.execute_script("window.scrollTo(0,document.documentElement.scrollHeight);")
+
+        # Wait to load page
+        sleep(SCROLL_PAUSE_TIME)
+
+        # Calculate new scroll height and compare with last scroll height
+        new_height = driver.execute_script("return document.documentElement.scrollHeight")
+        if new_height == last_height:
+            break
+        last_height = new_height
+def run():
+    driver = webdriver.Firefox(executable_path='./geckodriver.exe')
+    login(driver)
+    count = 0
+    df = getDataFrame()
+    newdata = pd.DataFrame()
+    for idx in df.index:
+        array = []
+        driver.get('https://www.facebook.com/profile.php?id=' + str(idx))
+        scroll(driver)
+        html = driver.page_source
+        soup = bs(html, 'html.parser')
+        friends = getFriendCount(html)
+        info = getIntro(soup)
+        job = info['Job']
+        current_town = info['Current_town']
+        home_town = info['Hometown']
+        name = getName(html)
+        page_count = getPostCount(soup)
+        bannerImageURL = getBannerImageURL(soup)
+        profilePictureURL = getProfilePictureURL(soup)
+        postStats = getPostStats(soup)
+        postelements = getPostElements(soup)
+        commentsPerPost = postStats[0]
+        likesPerPost = postStats[1]
+        sharesPerPost = postStats[2]
+        friendList = getFriendList(idx,driver,friends)
+        row = pd.DataFrame(data = np.array([[
+            idx,
+            name,
+            job, 
+            current_town, 
+            home_town, 
+            page_count, 
+            friends, 
+            bannerImageURL, 
+            profilePictureURL, 
+            friendList, 
+            commentsPerPost, 
+            likesPerPost, 
+            sharesPerPost,
+            postelements]
+            ],dtype=object),
+            columns=['id','Name','Job','Current_town', 'Home_town', 'Page_count', 'Number of Friends', 
+            'Banner URL', 'Profile URL', 'Friends List', 'Comments', 'Likes', 'Shares', 'Post Elements'])
+        if count%15 == 0 and count != 0:
+            sleep(15)
+        count +=1
+        newdata = pd.concat([newdata, row])
+    driver.close()
+    newdata.set_index('id', inplace=True)
+    datatoexcel = pd.ExcelWriter('facebook.xlsx')
+    newdata.to_excel(datatoexcel)
+    datatoexcel.save()
+    newdata
+# <---  End of Functions --->
+
+
+# <--- Start of Main --->
+# driver = webdriver.Firefox(executable_path='./geckodriver.exe')
+# login(driver)
+# generalSearch(driver)
+run()
+# <---  End of Main --->
+
+
+# <---   --->
+
+# <---   --->
+
+
+# <---   --->
+
+# <---   --->
+
+
+# <---   --->
+
+# <---   --->
+
+
+# <---   --->
+
+# <---   --->
+
+
+# <---   --->
+
+# <---   --->
+
+
+# <---   --->
+
+# <---   --->
 
