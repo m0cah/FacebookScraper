@@ -190,22 +190,6 @@ def getFriendList(id,driver, friends):
                 name = name.get_text()
                 data = {'name':name, 'link':link}
                 friendlist.append(data)
-    driver.get("https://www.facebook.com/profile.php?id="+str(id)+"&sk=friends")
-    for i in range(8):
-        driver.execute_script("window.scrollTo(0, window.scrollY + 600)")
-        sleep(1.1)
-    html = driver.page_source
-    friendlist = []
-    soup = bs(html, 'html.parser')
-    lister = soup.find('div', class_='j83agx80 btwxx1t3 lhclo0ds i1fnvgqd')
-    if not isinstance(lister, type(None)):
-        friends = lister.find_all('div', class_='buofh1pr hv4rvrfc')
-        for friend in friends:
-            name = friend.find('span',class_='d2edcug0 hpfvmrgz qv66sw1b c1et5uql lr9zc1uh a8c37x1j fe6kdd0r mau55g9w c8b282yb keod5gw0 nxhoafnm aigsh9s9 d3f4x2em mdeji52x a5q79mjw g1cxx5fr lrazzd5p oo9gr5id')
-            link = friend.find('a')['href']
-            name = name.get_text()
-            data = {'name':name, 'link':link}
-            friendlist.append(data)
     return friendlist
 def getPostStats(soup):
     posts = soup.find_all('div', {"class" : "stjgntxs ni8dbmo4 l82x9zwi uo3d90p7 h905i5nu monazrh9"})
@@ -323,7 +307,7 @@ def scoreCalc(idx,checks):
     if count == 4:
         newdata.at[idx, 'score'] = 100
 def scroll(driver):
-    SCROLL_PAUSE_TIME = 1.2
+    SCROLL_PAUSE_TIME = 1.5
     last_height = driver.execute_script("return document.documentElement.scrollHeight")
     while True:
         # Scroll down to bottom
@@ -382,11 +366,13 @@ def run():
             ],dtype=object),
             columns=['id','Name','Job','Current_town', 'Home_town', 'Page_count', 'Number of Friends', 
             'Banner URL', 'Profile URL', 'Friends List', 'Comments', 'Likes', 'Shares', 'Post Elements'])
+        sleep(1)
         if count%10 == 0 and count != 0:
             sleep(15)
         count +=1
         newdata = pd.concat([newdata, row])
     driver.close()
+    newdata = pd.merge(newdata, df, on='id')
     newdata.set_index('id', inplace=True)
     datatoexcel = pd.ExcelWriter('facebook.xlsx')
     newdata.to_excel(datatoexcel)
